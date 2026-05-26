@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RMA Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0D0F14;--surface:#161920;--card:#1E2230;--border:#2A2F3E;
+  --accent:#E8FF47;--red:#FF4B4B;--blue:#4B8EFF;--green:#3DFF9A;
+  --amber:#FFB347;--purple:#BF80FF;--cyan:#47E8FF;--orange:#FF7A47;
+  --text:#F0F2FF;--muted:#6B7280;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);pointer-events:none;z-index:0}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;top:0;left:0;width:228px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;padding:0 0 24px}
+.logo{padding:22px 20px 18px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.logo-mark{font-family:var(--display);font-size:21px;font-weight:800;color:var(--accent);display:flex;align-items:center;gap:8px}
+.logo-mark span{color:var(--text)}
+.logo-sub{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;margin-top:3px}
+.nav-group{padding:10px 12px 4px;font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;margin:1px 12px 1px 0;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-left:3px solid transparent;transition:all .15s;border-radius:0 6px 6px 0}
+.nav-item:hover{color:var(--text);background:var(--card)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(232,255,71,.06)}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.upload-btn{width:100%;padding:10px;background:var(--accent);color:#0D0F14;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:6px;cursor:pointer;transition:opacity .15s;position:relative;overflow:hidden}
+.upload-btn:hover{opacity:.88}
+.upload-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.file-loaded{font-family:var(--mono);font-size:9px;color:var(--green);margin-top:8px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── MAIN ── */
+.main{margin-left:228px;min-height:100vh;position:relative;z-index:1}
+
+/* ── TOPBAR ── */
+.topbar{position:sticky;top:0;background:rgba(13,15,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;z-index:50}
+.page-title{font-family:var(--display);font-size:18px;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.badge{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--border);color:var(--muted)}
+.badge.live{border-color:var(--green);color:var(--green)}
+
+/* ── PAGES ── */
+.page{display:none;padding:26px 28px;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── EMPTY ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:14px;text-align:center}
+.empty-icon{font-size:44px;opacity:.25}
+.empty h3{font-family:var(--display);font-size:18px;color:var(--muted)}
+.empty p{font-size:13px;color:var(--muted);max-width:320px;line-height:1.6}
+
+/* ── KPI ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--accent))}
+.kpi-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.kpi-val{font-family:var(--display);font-size:28px;font-weight:800;color:var(--kpi-color,var(--accent))}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ── SECTION ── */
+.section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-hd h2{font-family:var(--display);font-size:16px;font-weight:700}
+.section-hd .hint{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:auto;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--surface);font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody td{padding:10px 14px;color:var(--text);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+td.mono{font-family:var(--mono);font-size:11px}
+td.accent{color:var(--accent)}
+td.muted{color:var(--muted)}
+td.taxonomy{color:var(--cyan);font-size:11px}
+
+/* ── PILLS ── */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.06em;border:1px solid}
+.pill-red   {color:var(--red);   border-color:rgba(255,75,75,.35);  background:rgba(255,75,75,.08)}
+.pill-green {color:var(--green); border-color:rgba(61,255,154,.35); background:rgba(61,255,154,.08)}
+.pill-amber {color:var(--amber); border-color:rgba(255,179,71,.35); background:rgba(255,179,71,.08)}
+.pill-blue  {color:var(--blue);  border-color:rgba(75,142,255,.35); background:rgba(75,142,255,.08)}
+.pill-purple{color:var(--purple);border-color:rgba(191,128,255,.35);background:rgba(191,128,255,.08)}
+.pill-cyan  {color:var(--cyan);  border-color:rgba(71,232,255,.35); background:rgba(71,232,255,.08)}
+.pill-orange{color:var(--orange);border-color:rgba(255,122,71,.35); background:rgba(255,122,71,.08)}
+.pill-muted {color:var(--muted); border-color:var(--border);        background:transparent}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.search-box{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:8px 14px}
+.search-box input{background:none;border:none;outline:none;font-family:var(--sans);font-size:13px;color:var(--text);width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.filter-sel{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:10px;color:var(--text);outline:none;cursor:pointer}
+.filter-sel:focus{border-color:var(--accent)}
+
+/* ── STAT BARS ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px}
+.stat-card h3{font-family:var(--display);font-size:14px;font-weight:700;margin-bottom:14px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.bar-lbl{font-size:11px;color:var(--muted);width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.bar-pct{font-family:var(--mono);font-size:10px;color:var(--muted);width:36px;text-align:right}
+
+/* ── TREE EXPLORER ── */
+.tree-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px}
+.tree-wrap h3{font-family:var(--display);font-size:15px;font-weight:700;margin-bottom:16px}
+.tree-node{margin-left:0}
+.tree-fam{margin-bottom:8px}
+.tree-fam-hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(232,255,71,.06);border:1px solid rgba(232,255,71,.2);border-radius:6px;cursor:pointer;user-select:none;transition:background .15s}
+.tree-fam-hd:hover{background:rgba(232,255,71,.1)}
+.tree-fam-name{font-family:var(--display);font-size:13px;font-weight:700;color:var(--accent);flex:1}
+.tree-fam-count{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.tree-fam-arrow{font-size:10px;color:var(--muted);transition:transform .2s}
+.tree-fam-arrow.open{transform:rotate(90deg)}
+.tree-children{display:none;margin-left:18px;margin-top:4px;border-left:1px solid var(--border);padding-left:14px}
+.tree-children.open{display:block}
+.tree-sub{margin-bottom:6px}
+.tree-sub-hd{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(71,232,255,.04);border:1px solid rgba(71,232,255,.15);border-radius:5px;cursor:pointer;user-select:none;transition:background .15s}
+.tree-sub-hd:hover{background:rgba(71,232,255,.08)}
+.tree-sub-name{font-family:var(--mono);font-size:11px;color:var(--cyan);flex:1}
+.tree-sub-count{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.tree-sub-arrow{font-size:9px;color:var(--muted);transition:transform .2s}
+.tree-sub-arrow.open{transform:rotate(90deg)}
+.tree-grp-list{display:none;margin-left:16px;margin-top:4px;border-left:1px solid var(--border);padding-left:12px}
+.tree-grp-list.open{display:block}
+.tree-grp{display:flex;align-items:center;gap:8px;padding:4px 8px;margin-bottom:3px;cursor:pointer;border-radius:4px;transition:background .1s}
+.tree-grp:hover{background:rgba(255,255,255,.04)}
+.tree-grp-name{font-size:12px;color:var(--text);flex:1}
+.tree-grp-sub{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.tree-grp-cnt{font-family:var(--mono);font-size:10px;color:var(--amber)}
+
+/* ── DETAIL OVERLAY ── */
+.detail-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.detail-overlay.open{display:flex}
+.detail-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:660px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:28px;position:relative;animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.detail-close{position:absolute;top:16px;right:16px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:16px;width:30px;height:30px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s}
+.detail-close:hover{color:var(--text)}
+.detail-rma{font-family:var(--display);font-size:24px;font-weight:800;color:var(--accent);margin-bottom:2px}
+.detail-client{font-size:14px;color:var(--muted);margin-bottom:6px}
+.taxonomy-tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;color:var(--cyan);background:rgba(71,232,255,.08);border:1px solid rgba(71,232,255,.2);border-radius:4px;padding:2px 8px;margin-bottom:16px;flex-wrap:wrap;gap:6px}
+.tax-sep{color:var(--muted)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.detail-field{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.detail-field.full{grid-column:1/-1}
+.df-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.df-val{font-size:13px;color:var(--text);font-weight:500}
+.detail-actions{display:flex;gap:10px;flex-wrap:wrap}
+.action-btn{padding:9px 18px;border-radius:7px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:none;transition:all .15s;font-weight:500}
+.action-primary{background:var(--accent);color:#0D0F14}
+.action-primary:hover{opacity:.88}
+.action-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.action-secondary:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── LABEL PRINT ── */
+.label-preview{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;color:#1A1A18;font-family:'DM Mono',monospace;max-width:400px}
+.lp-header{background:#1A1A18;color:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:space-between}
+.lph-co{font-size:9px;letter-spacing:.18em;text-transform:uppercase;opacity:.6}
+.lph-rma{font-size:12px;font-weight:700;color:#E8FF47}
+.lp-body{display:flex}
+.lp-qr{padding:12px;border-right:1px solid #eee;display:flex;align-items:center;background:#fafafa;flex-shrink:0}
+#det-qr canvas,#det-qr img{display:block!important;width:72px!important;height:72px!important}
+.lp-info{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.lpi-row .lpi-lbl{font-size:7px;letter-spacing:.2em;text-transform:uppercase;color:#aaa}
+.lpi-row .lpi-val{font-size:11px;font-weight:700;color:#1A1A18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.lpi-row .lpi-val.tax{color:#0080A0;font-size:10px;font-weight:500}
+.lp-footer{border-top:1px solid #eee;padding:5px 14px;display:flex;justify-content:space-between;align-items:center}
+.lpf-date-lbl{font-size:7px;color:#aaa;letter-spacing:.1em;text-transform:uppercase}
+.lpf-date-val{font-size:9px;font-weight:600;color:#555}
+.lpf-tipo{font-size:8px;background:#1A1A18;color:#fff;padding:2px 7px;border-radius:2px;letter-spacing:.1em;text-transform:uppercase}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media print{
+  .sidebar,.topbar,.detail-overlay,.detail-actions,.toolbar,.section-hd .hint{display:none!important}
+  .main{margin-left:0}
+  .page{padding:0}
+  .label-preview{box-shadow:none;border:1.5px solid #000}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">⬡ <span>RMA</span>Manager</div>
+    <div class="logo-sub">v3.0 — Sistema Gestione</div>
+  </div>
+  <div class="nav-group">Principale</div>
+  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">◈</span> Dashboard</div>
+  <div class="nav-item" onclick="showPage('rma')"><span class="nav-icon">↩</span> Archivio RMA</div>
+  <div class="nav-item" onclick="showPage('catalogo')"><span class="nav-icon">◉</span> Catalogo Prodotti</div>
+  <div class="nav-item" onclick="showPage('stats')"><span class="nav-icon">◎</span> Statistiche</div>
+  <div class="nav-group">Strumenti</div>
+  <div class="nav-item" onclick="showPage('etichetta')"><span class="nav-icon">◻</span> Stampa Etichetta</div>
+  <div class="sidebar-footer">
+    <button class="upload-btn">⬆ Carica Excel<input type="file" accept=".xlsx,.xls" onchange="loadExcel(this.files[0])"></button>
+    <div class="file-loaded" id="fileLoaded" style="display:none"></div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="pageTitle">Dashboard</div>
+    <div class="topbar-right">
+      <div class="badge" id="recordCount">0 record</div>
+      <div class="badge live" id="statusBadge">● In attesa file</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div id="dash-empty" class="empty">
+      <div class="empty-icon">📂</div>
+      <h3>Nessun dato caricato</h3>
+      <p>Carica il file <strong>Database_RMA_v2.xlsx</strong> con il pulsante in basso a sinistra.</p>
+    </div>
+    <div id="dash-content" style="display:none">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="stat-grid">
+        <div class="stat-card"><h3>RMA per Stato</h3><div id="barStati"></div></div>
+        <div class="stat-card"><h3>Prodotti più Difettosi</h3><div id="barProdotti"></div></div>
+        <div class="stat-card"><h3>Difetti per Famiglia</h3><div id="barFamiglie"></div></div>
+        <div class="stat-card"><h3>Tipo Richiesta</h3><div id="barTipi"></div></div>
+      </div>
+      <div class="section-hd"><h2>Ultimi RMA</h2><span class="hint">click → dettaglio</span></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>N° RMA</th><th>Data</th><th>Cliente</th><th>Prodotto</th><th>Famiglia</th><th>Tipo</th><th>Priorità</th><th>Stato</th></tr></thead>
+        <tbody id="recentBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHIVIO RMA -->
+  <div class="page" id="page-rma">
+    <div class="toolbar">
+      <div class="search-box"><span style="color:var(--muted)">⌕</span><input type="text" id="searchInput" placeholder="Cerca N° RMA, cliente, prodotto, S/N..." oninput="filterTable()"></div>
+      <select class="filter-sel" id="fStato"    onchange="filterTable()"><option value="">Tutti gli stati</option><option>Aperto</option><option>In riparazione</option><option>In attesa parti</option><option>Chiuso</option><option>Annullato</option></select>
+      <select class="filter-sel" id="fTipo"     onchange="filterTable()"><option value="">Tutti i tipi</option><option>Garanzia</option><option>Sostituzione</option><option>Riparazione a pagamento</option><option>Rimborso</option></select>
+      <select class="filter-sel" id="fPrio"     onchange="filterTable()"><option value="">Tutte le priorità</option><option>Alta</option><option>Normale</option><option>Bassa</option></select>
+      <select class="filter-sel" id="fFamiglia" onchange="filterTable()"><option value="">Tutte le famiglie</option></select>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr>
+        <th>N° RMA</th><th>Data</th><th>Cliente</th><th>Prodotto</th>
+        <th>Famiglia</th><th>Sottofamiglia</th><th>Gruppo</th><th>Sottogruppo</th>
+        <th>S/N</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th>Tecnico</th>
+      </tr></thead><tbody id="rmaBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- CATALOGO PRODOTTI -->
+  <div class="page" id="page-catalogo">
+    <div id="cat-empty" class="empty"><div class="empty-icon">◉</div><h3>Nessun dato</h3><p>Carica il file Excel.</p></div>
+    <div id="cat-content" style="display:none">
+      <div class="section-hd"><h2>Albero Tassonomia Prodotti</h2><span class="hint">espandi per navigare</span></div>
+      <div class="tree-wrap"><h3>Famiglie → Sottofamiglie → Gruppi → Sottogruppi</h3><div id="treeRoot"></div></div>
+      <div class="section-hd"><h2>Vista Tabellare</h2></div>
+      <div class="toolbar">
+        <div class="search-box"><span style="color:var(--muted)">⌕</span><input type="text" id="catSearch" placeholder="Cerca prodotto, famiglia, gruppo..." oninput="filterCatalog()"></div>
+        <select class="filter-sel" id="catFam" onchange="filterCatalog()"><option value="">Tutte le famiglie</option></select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Prodotto</th><th>Famiglia</th><th>Sottofamiglia</th><th>Gruppo</th><th>Sottogruppo</th><th>RMA Totali</th><th>Aperti</th></tr></thead>
+        <tbody id="catBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATISTICHE -->
+  <div class="page" id="page-stats">
+    <div id="stats-empty" class="empty"><div class="empty-icon">◎</div><h3>Nessun dato</h3><p>Carica il file Excel.</p></div>
+    <div id="stats-content" style="display:none">
+      <div class="kpi-grid" id="statsKpi"></div>
+      <div class="stat-grid">
+        <div class="stat-card"><h3>Difetti per Prodotto</h3><div id="sProd"></div></div>
+        <div class="stat-card"><h3>Difetti per Famiglia Prodotto</h3><div id="sFam"></div></div>
+        <div class="stat-card"><h3>Difetti per Sottofamiglia</h3><div id="sSubFam"></div></div>
+        <div class="stat-card"><h3>Difetti per Gruppo</h3><div id="sGrp"></div></div>
+        <div class="stat-card"><h3>Distribuzione Stato</h3><div id="sStato"></div></div>
+        <div class="stat-card"><h3>Tipo Richiesta</h3><div id="sTipo"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ETICHETTA -->
+  <div class="page" id="page-etichetta">
+    <div style="max-width:520px">
+      <div class="section-hd"><h2>Stampa Etichetta RMA</h2></div>
+      <div class="toolbar" style="margin-bottom:16px">
+        <select class="filter-sel" style="flex:1;font-size:13px" id="labelRmaSelect" onchange="renderLabel()">
+          <option value="">— Seleziona N° RMA —</option>
+        </select>
+      </div>
+      <div id="labelEmpty" class="empty" style="min-height:35vh">
+        <div class="empty-icon">◻</div><h3>Nessun RMA selezionato</h3>
+        <p>Carica il file Excel e seleziona un RMA dal menu.</p>
+      </div>
+      <div id="labelPreview" style="display:none">
+        <div class="label-preview">
+          <div class="lp-header">
+            <span class="lph-co">TECHSERVICE SRL</span>
+            <span class="lph-rma" id="lph-rma"></span>
+          </div>
+          <div class="lp-body">
+            <div class="lp-qr"><div id="det-qr"></div></div>
+            <div class="lp-info">
+              <div class="lpi-row"><div class="lpi-lbl">N° RMA</div><div class="lpi-val" id="lpi-rma"></div></div>
+              <div class="lpi-row"><div class="lpi-lbl">Cliente</div><div class="lpi-val" id="lpi-cliente"></div></div>
+              <div class="lpi-row"><div class="lpi-lbl">Prodotto / S/N</div><div class="lpi-val" id="lpi-prodotto"></div></div>
+              <div class="lpi-row"><div class="lpi-lbl">Famiglia › Gruppo</div><div class="lpi-val tax" id="lpi-taxonomy"></div></div>
+            </div>
+          </div>
+          <div class="lp-footer">
+            <div><div class="lpf-date-lbl">Data</div><div class="lpf-date-val" id="lpi-date"></div></div>
+            <span class="lpf-tipo" id="lpi-tipo"></span>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="action-btn action-primary" onclick="window.print()">⬛ Stampa Etichetta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetailBg(event)">
+  <div class="detail-panel">
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div class="detail-rma" id="det-rma"></div>
+    <div class="detail-client" id="det-client"></div>
+    <div id="det-taxonomy" class="taxonomy-tag" style="display:none"></div>
+    <div class="detail-grid" id="det-grid"></div>
+    <div class="detail-actions">
+      <button class="action-btn action-primary" onclick="printFromDetail()">◻ Stampa Etichetta</button>
+      <button class="action-btn action-secondary" onclick="closeDetail()">✕ Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let DATA = [];
+let currentRow = null;
+let labelQr = null;
+
+// ── FIELD HELPERS ──────────────────────────────────────────────────────────────
+const F = {
+  rma:      r => fld(r,['n° rma','rma','numero rma']),
+  cliente:  r => fld(r,['cliente','ragione sociale','customer','client']),
+  prodotto: r => fld(r,['prodotto','product','descrizione prodotto']),
+  sn:       r => fld(r,['s/n o lotto','s/n','seriale','lotto']),
+  famiglia: r => fld(r,['famiglia prodotto','famiglia','family']),
+  subfam:   r => fld(r,['sottofamiglia prodotto','sottofamiglia','subfamily']),
+  gruppo:   r => fld(r,['gruppo prodotto','gruppo','group']),
+  subgrp:   r => fld(r,['sottogruppo prodotto','sottogruppo','subgroup']),
+  tipo:     r => fld(r,['tipo richiesta','tipo','type']),
+  prio:     r => fld(r,['priorità','priorita','priority']),
+  stato:    r => fld(r,['stato','status']),
+  tecnico:  r => fld(r,['tecnico','tecnico assegnato']),
+  difetto:  r => fld(r,['difetto segnalato','difetto','fault']),
+  dataAp:   r => fmtDate(fld(r,['data apertura','data','date'])),
+  dataCh:   r => fmtDate(fld(r,['data chiusura','chiusura'])),
+  esito:    r => fld(r,['esito']),
+  note:     r => fld(r,['note']),
+};
+
+function fld(row, keys){
+  for(const k of keys){ if(row[k]!==undefined && row[k]!=='') return String(row[k]); }
+  return '';
+}
+function fmtDate(v){
+  if(!v) return '';
+  const d = v instanceof Date ? v : new Date(v);
+  return isNaN(d) ? v : d.toLocaleDateString('it-IT');
+}
+function taxPath(r){
+  return [F.famiglia(r), F.subfam(r), F.gruppo(r), F.subgrp(r)].filter(Boolean);
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────────
+const TITLES = {dashboard:'Dashboard',rma:'Archivio RMA',catalogo:'Catalogo Prodotti',stats:'Statistiche',etichetta:'Stampa Etichetta'};
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')===`showPage('${id}')`)n.classList.add('active')});
+  document.getElementById('pageTitle').textContent=TITLES[id]||id;
+}
+
+// ── EXCEL LOAD ──────────────────────────────────────────────────────────────────
+function loadExcel(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const sn=wb.SheetNames.find(n=>n.toLowerCase().includes('database')||n.toLowerCase().includes('rma'))||wb.SheetNames[0];
+      const raw=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:''});
+      DATA=raw.map(r=>{const n={};Object.keys(r).forEach(k=>{n[k.trim().toLowerCase()]=r[k]});return n})
+               .filter(r=>fld(r,['n° rma','rma','numero rma']));
+      document.getElementById('fileLoaded').textContent='✔ '+file.name;
+      document.getElementById('fileLoaded').style.display='block';
+      document.getElementById('recordCount').textContent=DATA.length+' record';
+      document.getElementById('statusBadge').textContent='● Dati caricati';
+      document.getElementById('statusBadge').style.color='var(--green)';
+      document.getElementById('statusBadge').style.borderColor='rgba(61,255,154,.35)';
+      buildAll();
+    }catch(err){alert('Errore: '+err.message)}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildAll(){
+  buildDashboard();
+  buildRmaTable();
+  buildCatalog();
+  buildStats();
+  buildLabelSelect();
+  populateFilters();
+}
+
+// ── PILLS ──────────────────────────────────────────────────────────────────────
+function pillClass(val){
+  const v=(val||'').toLowerCase();
+  if(v.includes('chiuso'))          return 'pill-green';
+  if(v==='aperto')                  return 'pill-red';
+  if(v.includes('riparazione'))     return 'pill-amber';
+  if(v.includes('attesa'))          return 'pill-purple';
+  if(v.includes('annullato'))       return 'pill-muted';
+  if(v==='alta')                    return 'pill-red';
+  if(v==='normale')                 return 'pill-blue';
+  if(v==='bassa')                   return 'pill-muted';
+  if(v.includes('garanzia'))        return 'pill-blue';
+  if(v.includes('sostituzione'))    return 'pill-amber';
+  if(v.includes('rimborso'))        return 'pill-purple';
+  if(v.includes('pagamento'))       return 'pill-orange';
+  return 'pill-muted';
+}
+function pill(val){ return val?`<span class="pill ${pillClass(val)}">${val}</span>`:'<span style="color:var(--muted)">—</span>'; }
+function taxBadge(r){
+  const p=taxPath(r); if(!p.length) return '';
+  return `<span style="font-size:11px;color:var(--cyan);font-family:var(--mono)">${p.join(' › ')}</span>`;
+}
+
+// ── POPULATE FILTERS ───────────────────────────────────────────────────────────
+function populateFilters(){
+  const famSet=new Set(DATA.map(r=>F.famiglia(r)).filter(Boolean));
+  ['fFamiglia','catFam'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const first=sel.options[0].text;
+    sel.innerHTML=`<option value="">${first}</option>`;
+    famSet.forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;sel.appendChild(o)});
+  });
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────────
+function buildDashboard(){
+  document.getElementById('dash-empty').style.display='none';
+  document.getElementById('dash-content').style.display='block';
+  const total  = DATA.length;
+  const chiusi = DATA.filter(r=>F.stato(r).toLowerCase()==='chiuso').length;
+  const aperti = DATA.filter(r=>{const s=F.stato(r).toLowerCase();return s==='aperto'||s.includes('ripar')||s.includes('attesa')}).length;
+  const alta   = DATA.filter(r=>F.prio(r).toLowerCase()==='alta').length;
+  const famSet = new Set(DATA.map(r=>F.famiglia(r)).filter(Boolean));
+  const tasso  = total?Math.round(chiusi/total*100):0;
+
+  document.getElementById('kpiGrid').innerHTML=[
+    {label:'Totale RMA',      val:total,        sub:'nel database',          color:'var(--accent)'},
+    {label:'Aperti',          val:aperti,       sub:'in lavorazione',        color:'var(--red)'},
+    {label:'Chiusi',          val:chiusi,       sub:'completati',            color:'var(--green)'},
+    {label:'Alta Priorità',   val:alta,         sub:'urgenti',               color:'var(--amber)'},
+    {label:'Famiglie Prodotto',val:famSet.size, sub:'categorie',             color:'var(--cyan)'},
+    {label:'% Chiusura',      val:tasso+'%',    sub:'tasso risoluzione',     color:'var(--purple)'},
+  ].map(k=>`<div class="kpi" style="--kpi-color:${k.color}"><div class="kpi-label">${k.label}</div><div class="kpi-val">${k.val}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  renderBars('barStati',    countBy(r=>F.stato(r)),    ['var(--red)','var(--amber)','var(--purple)','var(--green)','var(--muted)'],6);
+  renderBars('barProdotti', countBy(r=>F.prodotto(r)), ['var(--blue)','var(--purple)','var(--accent)','var(--amber)','var(--orange)'],5);
+  renderBars('barFamiglie', countBy(r=>F.famiglia(r)), ['var(--cyan)','var(--blue)','var(--purple)','var(--accent)','var(--amber)'],6);
+  renderBars('barTipi',     countBy(r=>F.tipo(r)),     ['var(--blue)','var(--amber)','var(--orange)','var(--purple)'],6);
+
+  document.getElementById('recentBody').innerHTML=[...DATA].slice(-8).reverse().map(r=>`
+    <tr onclick="openDetail(${DATA.indexOf(r)})">
+      <td class="mono accent">${F.rma(r)}</td>
+      <td class="muted">${F.dataAp(r)}</td>
+      <td>${F.cliente(r)}</td>
+      <td>${F.prodotto(r)}</td>
+      <td class="taxonomy">${F.famiglia(r)||'—'}</td>
+      <td>${pill(F.tipo(r))}</td>
+      <td>${pill(F.prio(r))}</td>
+      <td>${pill(F.stato(r))}</td>
+    </tr>`).join('');
+}
+
+function countBy(fn, maxItems=99){
+  const c={};
+  DATA.forEach(r=>{const v=fn(r)||'(vuoto)';c[v]=(c[v]||0)+1});
+  return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,maxItems);
+}
+function renderBars(id, entries, colors, max=8){
+  const top=entries.slice(0,max);
+  const mx=top[0]?.[1]||1;
+  document.getElementById(id).innerHTML=top.map(([lbl,cnt],i)=>`
+    <div class="bar-row">
+      <div class="bar-lbl" title="${lbl}">${lbl}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(cnt/mx*100)}%;background:${colors[i%colors.length]}"></div></div>
+      <div class="bar-pct">${cnt}</div>
+    </div>`).join('');
+}
+
+// ── RMA TABLE ──────────────────────────────────────────────────────────────────
+function buildRmaTable(){ renderRmaRows(DATA); }
+
+function renderRmaRows(rows){
+  document.getElementById('rmaBody').innerHTML=rows.map(r=>`
+    <tr onclick="openDetail(${DATA.indexOf(r)})">
+      <td class="mono accent">${F.rma(r)}</td>
+      <td class="muted">${F.dataAp(r)}</td>
+      <td>${F.cliente(r)}</td>
+      <td>${F.prodotto(r)}</td>
+      <td class="taxonomy">${F.famiglia(r)||'—'}</td>
+      <td class="taxonomy">${F.subfam(r)||'—'}</td>
+      <td class="taxonomy">${F.gruppo(r)||'—'}</td>
+      <td class="taxonomy">${F.subgrp(r)||'—'}</td>
+      <td class="mono muted" style="font-size:10px">${F.sn(r)||'—'}</td>
+      <td>${pill(F.tipo(r))}</td>
+      <td>${pill(F.prio(r))}</td>
+      <td>${pill(F.stato(r))}</td>
+      <td class="muted">${F.tecnico(r)||'—'}</td>
+    </tr>`).join('');
+}
+
+function filterTable(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const st=document.getElementById('fStato').value.toLowerCase();
+  const tp=document.getElementById('fTipo').value.toLowerCase();
+  const pr=document.getElementById('fPrio').value.toLowerCase();
+  const fm=document.getElementById('fFamiglia').value.toLowerCase();
+  renderRmaRows(DATA.filter(r=>{
+    const txt=Object.values(r).join(' ').toLowerCase();
+    return (!q||txt.includes(q))
+      &&(!st||F.stato(r).toLowerCase()===st)
+      &&(!tp||F.tipo(r).toLowerCase()===tp)
+      &&(!pr||F.prio(r).toLowerCase()===pr)
+      &&(!fm||F.famiglia(r).toLowerCase()===fm);
+  }));
+}
+
+// ── CATALOG / TREE ─────────────────────────────────────────────────────────────
+function buildCatalog(){
+  document.getElementById('cat-empty').style.display='none';
+  document.getElementById('cat-content').style.display='block';
+
+  // Build taxonomy tree
+  const tree={};
+  DATA.forEach(r=>{
+    const fam=F.famiglia(r)||'(nessuna famiglia)';
+    const sub=F.subfam(r)||'(nessuna)';
+    const grp=F.gruppo(r)||'(nessuno)';
+    const sgrp=F.subgrp(r)||'';
+    const prod=F.prodotto(r)||'—';
+    if(!tree[fam]) tree[fam]={count:0,subs:{}};
+    tree[fam].count++;
+    if(!tree[fam].subs[sub]) tree[fam].subs[sub]={count:0,groups:{}};
+    tree[fam].subs[sub].count++;
+    const key=grp+(sgrp?' / '+sgrp:'');
+    if(!tree[fam].subs[sub].groups[key]) tree[fam].subs[sub].groups[key]={count:0,prod};
+    tree[fam].subs[sub].groups[key].count++;
+  });
+
+  let html='';
+  let fi=0;
+  Object.entries(tree).sort((a,b)=>b[1].count-a[1].count).forEach(([fam,fd])=>{
+    const famId='fam'+fi++;
+    html+=`<div class="tree-fam">
+      <div class="tree-fam-hd" onclick="toggleTree('${famId}')">
+        <span class="tree-fam-name">${fam}</span>
+        <span class="tree-fam-count">${fd.count} RMA</span>
+        <span class="tree-fam-arrow" id="arr-${famId}">▶</span>
+      </div>
+      <div class="tree-children" id="${famId}">`;
+    let si=0;
+    Object.entries(fd.subs).sort((a,b)=>b[1].count-a[1].count).forEach(([sub,sd])=>{
+      const subId=famId+'s'+si++;
+      html+=`<div class="tree-sub">
+        <div class="tree-sub-hd" onclick="toggleTree('${subId}')">
+          <span class="tree-sub-name">${sub}</span>
+          <span class="tree-sub-count">${sd.count} RMA</span>
+          <span class="tree-sub-arrow" id="arr-${subId}">▶</span>
+        </div>
+        <div class="tree-grp-list" id="${subId}">`;
+      Object.entries(sd.groups).sort((a,b)=>b[1].count-a[1].count).forEach(([grp,gd])=>{
+        html+=`<div class="tree-grp" onclick="filterByGroup('${fam}')">
+          <span class="tree-grp-name">${grp}</span>
+          <span class="tree-grp-cnt">${gd.count} RMA</span>
+        </div>`;
+      });
+      html+='</div></div>';
+    });
+    html+='</div></div>';
+  });
+  document.getElementById('treeRoot').innerHTML=html;
+
+  renderCatalogRows(DATA);
+}
+
+function toggleTree(id){
+  const el=document.getElementById(id);
+  const arr=document.getElementById('arr-'+id);
+  el.classList.toggle('open');
+  arr.classList.toggle('open');
+}
+
+function filterByGroup(fam){
+  showPage('rma');
+  document.getElementById('fFamiglia').value=fam;
+  filterTable();
+}
+
+function renderCatalogRows(rows){
+  const prodMap={};
+  rows.forEach(r=>{
+    const key=F.prodotto(r);
+    if(!prodMap[key]) prodMap[key]={r,total:0,aperti:0};
+    prodMap[key].total++;
+    const s=F.stato(r).toLowerCase();
+    if(s==='aperto'||s.includes('ripar')||s.includes('attesa')) prodMap[key].aperti++;
+  });
+  document.getElementById('catBody').innerHTML=Object.entries(prodMap).sort((a,b)=>b[1].total-a[1].total).map(([prod,d])=>`
+    <tr onclick="filterByProd('${prod}')">
+      <td>${prod}</td>
+      <td class="taxonomy">${F.famiglia(d.r)||'—'}</td>
+      <td class="taxonomy">${F.subfam(d.r)||'—'}</td>
+      <td class="taxonomy">${F.gruppo(d.r)||'—'}</td>
+      <td class="taxonomy">${F.subgrp(d.r)||'—'}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--accent)">${d.total}</td>
+      <td>${d.aperti>0?`<span style="font-family:var(--mono);color:var(--red);font-weight:700">${d.aperti}</span>`:'<span style="color:var(--muted)">0</span>'}</td>
+    </tr>`).join('');
+}
+
+function filterByProd(prod){
+  showPage('rma');
+  document.getElementById('searchInput').value=prod;
+  filterTable();
+}
+
+function filterCatalog(){
+  const q=document.getElementById('catSearch').value.toLowerCase();
+  const fm=document.getElementById('catFam').value.toLowerCase();
+  renderCatalogRows(DATA.filter(r=>{
+    const txt=(F.prodotto(r)+F.famiglia(r)+F.subfam(r)+F.gruppo(r)+F.subgrp(r)).toLowerCase();
+    return (!q||txt.includes(q))&&(!fm||F.famiglia(r).toLowerCase()===fm);
+  }));
+}
+
+// ── STATS ──────────────────────────────────────────────────────────────────────
+function buildStats(){
+  if(!DATA.length) return;
+  document.getElementById('stats-empty').style.display='none';
+  document.getElementById('stats-content').style.display='block';
+  const total=DATA.length;
+  const chiusi=DATA.filter(r=>F.stato(r).toLowerCase()==='chiuso').length;
+  const famSet=new Set(DATA.map(r=>F.famiglia(r)).filter(Boolean));
+  const subSet=new Set(DATA.map(r=>F.subfam(r)).filter(Boolean));
+
+  document.getElementById('statsKpi').innerHTML=[
+    {label:'Totale RMA',        val:total,     color:'var(--accent)'},
+    {label:'Risolti',           val:chiusi,    color:'var(--green)'},
+    {label:'Famiglie',          val:famSet.size,color:'var(--cyan)'},
+    {label:'Sottofamiglie',     val:subSet.size,color:'var(--blue)'},
+    {label:'% Risoluzione',     val:(total?Math.round(chiusi/total*100):0)+'%',color:'var(--purple)'},
+  ].map(k=>`<div class="kpi" style="--kpi-color:${k.color}"><div class="kpi-label">${k.label}</div><div class="kpi-val">${k.val}</div></div>`).join('');
+
+  renderBars('sProd',    countBy(r=>F.prodotto(r)), ['var(--blue)','var(--purple)','var(--accent)','var(--amber)','var(--orange)','var(--red)'],8);
+  renderBars('sFam',     countBy(r=>F.famiglia(r)), ['var(--cyan)','var(--blue)','var(--purple)','var(--accent)','var(--amber)'],8);
+  renderBars('sSubFam',  countBy(r=>F.subfam(r)),   ['var(--blue)','var(--cyan)','var(--purple)','var(--amber)','var(--orange)'],8);
+  renderBars('sGrp',     countBy(r=>F.gruppo(r)),   ['var(--purple)','var(--blue)','var(--cyan)','var(--amber)'],8);
+  renderBars('sStato',   countBy(r=>F.stato(r)),    ['var(--red)','var(--amber)','var(--purple)','var(--green)','var(--muted)'],6);
+  renderBars('sTipo',    countBy(r=>F.tipo(r)),     ['var(--blue)','var(--amber)','var(--orange)','var(--purple)'],6);
+}
+
+// ── DETAIL ─────────────────────────────────────────────────────────────────────
+function openDetail(idx){
+  currentRow=DATA[idx];
+  const r=currentRow;
+  document.getElementById('det-rma').textContent=F.rma(r);
+  document.getElementById('det-client').textContent=F.cliente(r);
+  const path=taxPath(r);
+  const taxEl=document.getElementById('det-taxonomy');
+  if(path.length){
+    taxEl.style.display='inline-flex';
+    taxEl.innerHTML=path.map((p,i)=>`${i>0?'<span class="tax-sep">›</span>':''}<span>${p}</span>`).join('');
+  } else taxEl.style.display='none';
+
+  document.getElementById('det-grid').innerHTML=[
+    ['Data Apertura',F.dataAp(r)],['Prodotto',F.prodotto(r)],
+    ['S/N o Lotto',F.sn(r)],     ['Tipo Richiesta',F.tipo(r)],
+    ['Priorità',F.prio(r)],       ['Stato',F.stato(r)],
+    ['Tecnico',F.tecnico(r)],     ['Data Chiusura',F.dataCh(r)],
+    ['Esito',F.esito(r),''],
+    ['Difetto Segnalato',F.difetto(r),'full'],
+    ['Note',F.note(r),'full'],
+  ].map(([lbl,val,cls])=>`
+    <div class="detail-field ${cls||''}">
+      <div class="df-lbl">${lbl}</div>
+      <div class="df-val">${val||'—'}</div>
+    </div>`).join('');
+
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail(){ document.getElementById('detailOverlay').classList.remove('open'); }
+function closeDetailBg(e){ if(e.target===document.getElementById('detailOverlay')) closeDetail(); }
+function printFromDetail(){ if(!currentRow){closeDetail();return;} populateLabel(currentRow); showPage('etichetta'); closeDetail(); setTimeout(()=>window.print(),300); }
+
+// ── LABEL ──────────────────────────────────────────────────────────────────────
+function buildLabelSelect(){
+  const sel=document.getElementById('labelRmaSelect');
+  sel.innerHTML='<option value="">— Seleziona N° RMA —</option>';
+  DATA.forEach((r,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i;
+    opt.textContent=`${F.rma(r)}  —  ${F.cliente(r)}`;
+    sel.appendChild(opt);
+  });
+}
+
+function renderLabel(){
+  const v=document.getElementById('labelRmaSelect').value;
+  if(!v){ document.getElementById('labelEmpty').style.display='flex'; document.getElementById('labelPreview').style.display='none'; return; }
+  populateLabel(DATA[parseInt(v)]);
+}
+
+function populateLabel(r){
+  const rma=F.rma(r), cliente=F.cliente(r);
+  const prodotto=F.prodotto(r), sn=F.sn(r);
+  const tipo=F.tipo(r), data=F.dataAp(r);
+  const tax=taxPath(r);
+
+  document.getElementById('lph-rma').textContent=rma;
+  document.getElementById('lpi-rma').textContent=rma;
+  document.getElementById('lpi-cliente').textContent=cliente;
+  document.getElementById('lpi-prodotto').textContent=prodotto+(sn?' / '+sn:'');
+  document.getElementById('lpi-taxonomy').textContent=tax.length?tax.join(' › '):'—';
+  document.getElementById('lpi-tipo').textContent=tipo||'RMA';
+  document.getElementById('lpi-date').textContent=data||new Date().toLocaleDateString('it-IT');
+
+  document.getElementById('det-qr').innerHTML='';
+  new QRCode(document.getElementById('det-qr'),{
+    text:`${rma}|${cliente}|${prodotto}`,
+    width:72,height:72,colorDark:'#1A1A18',colorLight:'#FAFAFA',
+    correctLevel:QRCode.CorrectLevel.M
+  });
+
+  document.getElementById('labelEmpty').style.display='none';
+  document.getElementById('labelPreview').style.display='block';
+}
+</script>
+</body>
+</html>
